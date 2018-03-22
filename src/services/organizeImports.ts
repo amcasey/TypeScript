@@ -34,6 +34,8 @@ namespace ts.OrganizeImports {
                 return;
             }
 
+            suppressLeadingAndTrailingTrivia(oldImportDecls[0]); // TODO (acasey): just leading
+
             const oldImportGroups = group(oldImportDecls, importDecl => getExternalModuleName(importDecl.moduleSpecifier));
             const sortedImportGroups = stableSort(oldImportGroups, (group1, group2) => compareModuleSpecifiers(group1[0].moduleSpecifier, group2[0].moduleSpecifier));
             const newImportDecls = flatMap(sortedImportGroups, importGroup =>
@@ -43,12 +45,15 @@ namespace ts.OrganizeImports {
 
             // Delete or replace the first import.
             if (newImportDecls.length === 0) {
-                changeTracker.deleteNode(sourceFile, oldImportDecls[0]);
+                changeTracker.deleteNode(sourceFile, oldImportDecls[0], {
+                    useNonAdjustedStartPosition: true,
+                    useNonAdjustedEndPosition: false,
+                });
             }
             else {
                 // Note: Delete the surrounding trivia because it will have been retained in newImportDecls.
                 changeTracker.replaceNodeWithNodes(sourceFile, oldImportDecls[0], newImportDecls, {
-                    useNonAdjustedStartPosition: false,
+                    useNonAdjustedStartPosition: true,
                     useNonAdjustedEndPosition: false,
                     suffix: getNewLineOrDefaultFromHost(host, formatContext.options),
                 });
