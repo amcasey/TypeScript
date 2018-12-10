@@ -379,11 +379,21 @@ namespace ts {
     }
 
     function watchFile(host: WatchFileHost, file: string, callback: FileWatcherCallback, pollingInterval: PollingInterval): FileWatcher {
-        return host.watchFile(file, callback, pollingInterval);
+        try {
+            if (etwLogger) etwLogger.logStartWatchFile(file);
+            return host.watchFile(file, callback, pollingInterval);
+        } finally {
+            if (etwLogger) etwLogger.logStopWatchFile();
+        }
     }
 
     function watchDirectory(host: WatchDirectoryHost, directory: string, callback: DirectoryWatcherCallback, flags: WatchDirectoryFlags): FileWatcher {
-        return host.watchDirectory(directory, callback, (flags & WatchDirectoryFlags.Recursive) !== 0);
+        try {
+            if (etwLogger) etwLogger.logStartWatchDirectory(directory, flags.toString());
+            return host.watchDirectory(directory, callback, (flags & WatchDirectoryFlags.Recursive) !== 0);
+        } finally {
+            if (etwLogger) etwLogger.logStopWatchDirectory();
+        }
     }
 
     type WatchCallback<T, U> = (fileName: string, cbOptional?: T, passThrough?: U) => void;
