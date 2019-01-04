@@ -2429,6 +2429,7 @@ namespace ts.server {
             let relevantFile: protocol.FileRequestArgs | undefined;
             try {
                 request = <protocol.Request>JSON.parse(message);
+                if (etwLogger) etwLogger.logStartCommand(request.command, message);
                 const { response, responseRequired } = this.executeCommand(request);
 
                 if (this.logger.hasLevel(LogLevel.requestTime)) {
