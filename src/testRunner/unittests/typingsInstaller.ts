@@ -1058,7 +1058,7 @@ namespace ts.projectSystem {
             projectService.checkNumberOfProjects({ inferredProjects: 1 });
 
             const proj = projectService.inferredProjects[0];
-            proj.updateGraph();
+            proj.updateGraph("test");
 
             assert.deepEqual(
                 proj.cachedUnresolvedImportsPerFile.get(<Path>f1.path),

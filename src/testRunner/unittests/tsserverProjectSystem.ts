@@ -2546,7 +2546,7 @@ namespace ts.projectSystem {
             assert.equal(actualText, "", `expected content to be empty string, got "${actualText}"`);
 
             projectService.openClientFile(file1.path, `var x = 1;`);
-            project.updateGraph();
+            project.updateGraph("test");
 
             const quickInfo = project.getLanguageService().getQuickInfoAtPosition(file1.path, 4)!;
             assert.equal(quickInfo.kind, ScriptElementKind.variableElement);
@@ -4664,7 +4664,7 @@ var x = 10;`
 
             const p = projectService.externalProjects[0];
             // force to load the content of the file
-            p.updateGraph();
+            p.updateGraph("test");
 
             const scriptInfo = p.getScriptInfo(f.path)!;
             checkSnapLength(scriptInfo.getSnapshot(), f.content.length);

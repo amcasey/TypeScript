@@ -417,7 +417,7 @@ namespace ts.server {
 
     /*@internal*/
     export function updateProjectIfDirty(project: Project) {
-        return project.dirty && project.updateGraph();
+        return project.dirty && project.updateGraph("updateProjectIfDirty");
     }
 
     function setProjectOptionsUsed(project: ConfiguredProject | ExternalProject) {
@@ -1088,7 +1088,7 @@ namespace ts.server {
                 info.detachFromProject(project);
                 info.containingProjects.unshift(project);
             }
-            project.updateGraph();
+            project.updateGraph("assignOrphanScriptInfoToInferredProject");
 
             if (!this.useSingleInferredProject && !project.projectRootPath) {
                 // Note that we need to create a copy of the array since the list of project can change
@@ -1688,7 +1688,7 @@ namespace ts.server {
         /* @internal */
         private createLoadAndUpdateConfiguredProject(configFileName: NormalizedPath, reason: string) {
             const project = this.createAndLoadConfiguredProject(configFileName, reason);
-            project.updateGraph();
+            project.updateGraph("createLoadAndUpdateConfiguredProject");
             return project;
         }
 
@@ -1830,7 +1830,7 @@ namespace ts.server {
             const fileNamesResult = getFileNamesFromConfigSpecs(configFileSpecs, getDirectoryPath(configFileName), project.getCompilationSettings(), project.getCachedDirectoryStructureHost(), this.hostConfiguration.extraFileExtensions);
             project.updateErrorOnNoInputFiles(fileNamesResult);
             this.updateNonInferredProjectFiles(project, fileNamesResult.fileNames.concat(project.getExternalFiles()), fileNamePropertyReader);
-            return project.updateGraph();
+            return project.updateGraph("createLoadAndUpdateConfiguredProject");
         }
 
         /**
@@ -1848,7 +1848,7 @@ namespace ts.server {
 
             // Load project from the disk
             this.loadConfiguredProject(project, reason);
-            project.updateGraph();
+            project.updateGraph("reloadConfiguredProject");
 
             this.sendConfigFileDiagEvent(project, configFileName);
         }
@@ -2221,7 +2221,7 @@ namespace ts.server {
                             if (project.hasExternalProjectRef() &&
                                 project.pendingReload === ConfigFileProgramReloadLevel.Full &&
                                 !this.pendingProjectUpdates.has(project.getProjectName())) {
-                                project.updateGraph();
+                                project.updateGraph("setHostConfiguration");
                             }
                         });
                     }
@@ -2829,7 +2829,7 @@ namespace ts.server {
                     // external project already exists and not config files were added - update the project and return;
                     // The graph update here isnt postponed since any file open operation needs all updated external projects
                     this.updateRootAndOptionsOfNonInferredProject(externalProject, proj.rootFiles, externalFilePropertyReader, compilerOptions, proj.typeAcquisition, proj.options.compileOnSave);
-                    externalProject.updateGraph();
+                    externalProject.updateGraph("openExternalProject - existing");
                     return;
                 }
                 // some config files were added to external project (that previously were not there)
@@ -2893,7 +2893,7 @@ namespace ts.server {
                 // any file open operation needs all updated external projects
                 this.externalProjectToConfiguredProjectMap.delete(proj.projectFileName);
                 const project = this.createExternalProject(proj.projectFileName, rootFiles, proj.options, proj.typeAcquisition, excludedFiles);
-                project.updateGraph();
+                project.updateGraph("openExternalProject - no config");
             }
         }
 

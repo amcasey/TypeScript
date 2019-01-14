@@ -821,8 +821,8 @@ namespace ts.server {
          * Updates set of files that contribute to this project
          * @returns: true if set of files in the project stays the same and false - otherwise.
          */
-        updateGraph(): boolean {
-            if (etwLogger) etwLogger.logStartUpdateGraph();
+        updateGraph(reason: string): boolean {
+            if (etwLogger) etwLogger.logStartUpdateGraph(this.projectName, reason);
             try {
                 this.resolutionCache.startRecordingFilesWithChangedResolutions();
 
@@ -1403,7 +1403,7 @@ namespace ts.server {
          * If the project has reload from disk pending, it reloads (and then updates graph as part of that) instead of just updating the graph
          * @returns: true if set of files in the project stays the same and false - otherwise.
          */
-        updateGraph(): boolean {
+        updateGraph(reason: string): boolean {
             this.isInitialLoadPending = returnFalse;
             const reloadLevel = this.pendingReload;
             this.pendingReload = ConfigFileProgramReloadLevel.None;
@@ -1413,13 +1413,15 @@ namespace ts.server {
                     result = this.projectService.reloadFileNamesOfConfiguredProject(this);
                     break;
                 case ConfigFileProgramReloadLevel.Full:
+                {
                     const reason = Debug.assertDefined(this.pendingReloadReason);
                     this.pendingReloadReason = undefined;
                     this.projectService.reloadConfiguredProject(this, reason);
                     result = true;
                     break;
+                }
                 default:
-                    result = super.updateGraph();
+                    result = super.updateGraph(reason);
             }
             this.projectService.sendProjectLoadingFinishEvent(this);
             this.projectService.sendProjectTelemetry(this);
@@ -1616,8 +1618,8 @@ namespace ts.server {
                 getDirectoryPath(projectFilePath || normalizeSlashes(externalProjectName)));
         }
 
-        updateGraph() {
-            const result = super.updateGraph();
+        updateGraph(reason: string) {
+            const result = super.updateGraph(reason);
             this.projectService.sendProjectTelemetry(this);
             this.projectService.sendSurveyReady(this);
             return result;
