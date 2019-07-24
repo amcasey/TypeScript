@@ -1465,18 +1465,18 @@ namespace ts.server {
 
             // If projectRootPath doesn't contain info.path, then do normal search for config file
             const anySearchPathOk = !projectRootPath || !isSearchPathInProjectRoot();
+            const scriptKind = (info as ScriptInfo).scriptKind || ScriptKind.Unknown;
+            const configFileNames = (scriptKind == ScriptKind.JS || scriptKind == ScriptKind.JSX)
+                ? [ "jsconfig.json", "tsconfig.json" ]
+                : [ "tsconfig.json", "jsconfig.json" ];
             do {
                 const canonicalSearchPath = normalizedPathToPath(searchPath, this.currentDirectory, this.toCanonicalFileName);
-                const tsconfigFileName = asNormalizedPath(combinePaths(searchPath, "tsconfig.json"));
-                let result = action(tsconfigFileName, combinePaths(canonicalSearchPath, "tsconfig.json"));
-                if (result) {
-                    return tsconfigFileName;
-                }
-
-                const jsconfigFileName = asNormalizedPath(combinePaths(searchPath, "jsconfig.json"));
-                result = action(jsconfigFileName, combinePaths(canonicalSearchPath, "jsconfig.json"));
-                if (result) {
-                    return jsconfigFileName;
+                for (const configFileName of configFileNames) {
+                    const configFilePath = asNormalizedPath(combinePaths(searchPath, configFileName));
+                    let result = action(configFilePath, combinePaths(canonicalSearchPath, configFileName));
+                    if (result) {
+                        return configFilePath;
+                    }
                 }
 
                 const parentPath = asNormalizedPath(getDirectoryPath(searchPath));
