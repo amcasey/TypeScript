@@ -1076,6 +1076,9 @@ namespace ts {
         // For testing
         /*@internal*/ now?(): Date;
         /*@internal*/ require?(baseDir: string, moduleName: string): RequireResult;
+
+        /*@internal*/ isWorker?: boolean;
+        /*@internal*/ fork?(args: string[]): Promise<void>;
     }
 
     export interface FileWatcher {
@@ -1120,6 +1123,7 @@ namespace ts {
             const _fs: typeof import("fs") = require("fs");
             const _path: typeof import("path") = require("path");
             const _os = require("os");
+            const _th = require("thread_helper");
             // crypto can be absent on reduced node installations
             let _crypto: typeof import("crypto") | undefined;
             try {
@@ -1161,8 +1165,114 @@ namespace ts {
                 useNonPollingWatchers: process.env.TSC_NONPOLLING_WATCHER,
                 tscWatchDirectory: process.env.TSC_WATCHDIRECTORY,
             });
+
+            let isWorker: boolean;
+            let fork: (args: string[]) => Promise<void>;
+            let args = process.argv.slice(2);
+
+            if (!!_th) {
+                isWorker = !!_th.parentPort;
+                fork = args => new Promise((resolve, reject) => {
+                    const worker = new _th.Worker(__filename); // TODO (acasey): pool workers
+
+                    let messageListener: (value: any) => void;
+                    let errorListener: (err: Error) => void;
+                    let exitListener: (exitCode: number) => void;
+
+                    const removeListeners = () => {
+                        worker.removeListener("message", messageListener);
+                        worker.removeListener("error", errorListener);
+                        worker.removeListener("exit", exitListener);
+                    };
+
+                    messageListener = (_value) => {
+                        // TODO (acasey): return ID for confirming order?
+                        removeListeners();
+                        resolve();
+                    };
+
+                    errorListener = err => {
+                        removeListeners();
+                        reject(err); // TODO (acasey): formalize
+                    };
+
+                    exitListener = exitCode => {
+                        removeListeners();
+                        reject(exitCode); // TODO (acasey): formalize
+                    };
+
+                    worker.on("message", messageListener);
+                    worker.on("error", errorListener);
+                    worker.on("exit", exitListener);
+
+                    worker.postMessage(args);
+                });
+            }
+            else {
+                const _cp = require("child_process");
+                if (args.length > 0) {
+                    isWorker = args[0] === "__helper__";
+                    args = args.slice(1);
+                }
+                else {
+                    isWorker = false;
+                }
+                fork = args => new Promise((resolve, reject) => {
+                    const worker = new _cp.fork(__filename); // TODO (acasey): pool workers
+
+                    // TODO (acasey): de-dup with thread code
+                    let messageListener: (value: any) => void;
+                    let errorListener: (err: Error) => void;
+                    let exitListener: (exitCode: number) => void;
+                    let closeListener: (code: number, signal: string /*from a union*/) => void;
+                    let disconnectListener: () => void;
+
+                    const removeListeners = () => {
+                        worker.removeListener("message", messageListener);
+                        worker.removeListener("error", errorListener);
+                        worker.removeListener("exit", exitListener);
+                        worker.removeListener("close", closeListener);
+                        worker.removeListener("disconnect", disconnectListener);
+                    };
+
+                    messageListener = (_value) => {
+                        // TODO (acasey): return ID for confirming order?
+                        removeListeners();
+                        resolve();
+                    };
+
+                    errorListener = err => {
+                        removeListeners();
+                        reject(err); // TODO (acasey): formalize
+                    };
+
+                    exitListener = exitCode => {
+                        removeListeners();
+                        reject(exitCode); // TODO (acasey): formalize
+                    };
+
+                    closeListener = (code, _signal) => {
+                        removeListeners();
+                        reject(code);  // TODO (acasey): formalize
+                    };
+
+                    disconnectListener = () => {
+                        removeListeners();
+                        reject("disconnected");  // TODO (acasey): formalize
+                    }
+
+                    worker.on("message", messageListener);
+                    worker.on("error", errorListener);
+                    worker.on("exit", exitListener);
+                    worker.on("close", closeListener);
+                    worker.on("disconnect", disconnectListener);
+
+                    worker.send(["__helper__", ...args], errorListener);
+                });
+            }
+
             const nodeSystem: System = {
-                args: process.argv.slice(2),
+                args,
                 newLine: _os.EOL,
                 useCaseSensitiveFileNames,
                 write(s: string): void {
@@ -1261,7 +1371,9 @@ namespace ts {
                     catch (error) {
                         return { module: undefined, modulePath: undefined, error };
                     }
-                }
+                },
+                isWorker,
+                fork
             };
             return nodeSystem;
 
