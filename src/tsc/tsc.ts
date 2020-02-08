@@ -12,4 +12,7 @@ if (ts.sys.setBlocking) {
     ts.sys.setBlocking();
 }
 
-ts.executeCommandLine(ts.sys, ts.noop, ts.sys.args);
+ts.executeCommandLine(ts.sys, ts.noop, ts.sys.args); // TODO (acasey): I don't see how we can honor callbacks in parallel mode - I don't believe they can cross thread boundaries
+
+// TODO (acasey): assuming this is the entry point of the helper threads, there needs to be a way to build a single project
+// Manipulating args is probably sufficient, but it will likely require a bunch of redundant up-to-date checks

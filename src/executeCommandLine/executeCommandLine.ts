@@ -463,7 +463,7 @@ namespace ts {
             updateSolutionBuilderHost(sys, cb, buildHost);
             const builder = createSolutionBuilderWithWatch(buildHost, projects, buildOptions, watchOptions);
             builder.build();
-            return builder;
+            return builder; // TODO (acasey): do we really need to return the builder?
         }
 
         const buildHost = createSolutionBuilderHost(

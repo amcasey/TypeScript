@@ -145,6 +145,7 @@ namespace ts {
     }
 
     export interface SolutionBuilder<T extends BuilderProgram> {
+        // TODO (acasey): buildAllAsync?
         build(project?: string, cancellationToken?: CancellationToken): ExitStatus;
         clean(project?: string): ExitStatus;
         buildReferences(project: string, cancellationToken?: CancellationToken): ExitStatus;
@@ -399,6 +400,7 @@ namespace ts {
         return resolveConfigFileProjectName(resolvePath(state.currentDirectory, name));
     }
 
+    // TODO (acasey): this is the build order that needs to become a DAG
     function createBuildOrder(state: SolutionBuilderState, roots: readonly ResolvedConfigFileName[]): AnyBuildOrder {
         const temporaryMarks = createMap() as ConfigFileMap<true>;
         const permanentMarks = createMap() as ConfigFileMap<true>;
@@ -1654,7 +1656,7 @@ namespace ts {
 
         let reportQueue = true;
         let successfulProjects = 0;
-        while (true) {
+        while (true) { // TODO (acasey): this is the loop that needs to be parallelized
             const invalidatedProject = getNextInvalidatedProject(state, buildOrder, reportQueue);
             if (!invalidatedProject) break;
             reportQueue = false;

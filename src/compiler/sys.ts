@@ -1069,7 +1069,7 @@ namespace ts {
         setTimeout?(callback: (...args: any[]) => void, ms: number, ...args: any[]): any;
         clearTimeout?(timeoutId: any): void;
         clearScreen?(): void;
-        /*@internal*/ setBlocking?(): void;
+        /*@internal*/ setBlocking?(): void; // TODO (acasey): what is this? (A: it makes *console.log* blocking)
         base64decode?(input: string): string;
         base64encode?(input: string): string;
         /*@internal*/ bufferFrom?(input: string, encoding?: string): Buffer;
