@@ -12,13 +12,18 @@ if (ts.sys.setBlocking) {
     ts.sys.setBlocking();
 }
 
-// TODO (acasey): fork in a sensible place
-if (ts.sys.isWorker || !ts.sys.fork) {
-    ts.executeCommandLine(ts.sys, ts.noop, ts.sys.args); // TODO (acasey): I don't see how we can honor callbacks in parallel mode - I don't believe they can cross thread boundaries
+// TODO (acasey): handle forking in a sensible place
+if (ts.sys.on) {
+    ts.sys.on("parentRequest", args => {
+        ts.executeCommandLine(ts.sys, ts.noop, args); // TODO (acasey): I don't see how we can honor callbacks in parallel mode - I don't believe they can cross thread boundaries
+        return "done"; // TODO (acasey): real return
+    });
+}
+else if (ts.sys.fork) {
+    ts.sys.fork(ts.sys.args).catch(err => { ts.sys.write("Worker error: " + err + ts.sys.newLine); });
 }
 else {
-    // TODO (acasey): does this process survive?
-    ts.sys.fork(ts.sys.args).catch(err => { ts.sys.write("Worker error: " + err + ts.sys.newLine); });
+    ts.executeCommandLine(ts.sys, ts.noop, ts.sys.args);
 }
 
 

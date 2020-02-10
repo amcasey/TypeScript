@@ -1077,8 +1077,9 @@ namespace ts {
         /*@internal*/ now?(): Date;
         /*@internal*/ require?(baseDir: string, moduleName: string): RequireResult;
 
-        /*@internal*/ isWorker?: boolean;
         /*@internal*/ fork?(args: string[]): Promise<void>;
+        /*@internal*/ on?: (event: "parentRequest", listener: (args: string[]) => string | Error) => void;
+
     }
 
     export interface FileWatcher {
@@ -1175,11 +1176,27 @@ namespace ts {
 
             let args = process.argv.slice(2);
 
-            let isWorker: boolean;
             let fork: (args: string[]) => Promise<void>;
 
+            type Listener = (args: string[]) => string | Error;
+            const listeners: Listener[] = [];
+            let on = (_event: "parentRequest", listener: Listener) => {
+                listeners.push(listener);
+            };
+
             if (!!_wt) {
-                isWorker = !!_wt.parentPort;
+                if (!!_wt.parentPort) {
+                    // TODO (acasey): other handlers?
+                    _wt.parentPort.on("message", (args: string[]) => {
+                        for (const listener of listeners) {
+                            // TODO (acasey): just run it?
+                            setImmediate(() => {
+                                const result = listener(args);
+                                _wt!.parentPort!.postMessage(result);
+                            });
+                        }
+                    });
+                }
 
                 fork = args => new Promise((resolve, reject) => {
                     const worker = new _wt!.Worker(__filename); // TODO (acasey): pool workers
@@ -1218,16 +1235,26 @@ namespace ts {
                 });
             }
             else {
-                const _cp = require("child_process");
+                const _cp: typeof import("child_process") = require("child_process");
 
-                isWorker = args.length > 0 && args[0] === "__helper__";
-
+                const isWorker = args.length > 0 && args[0] === "__helper__";
                 if (isWorker) {
                     args = args.slice(1);
+
+                    // TODO (acasey): other handlers?
+                    process.on("message", (args: string[]) => {
+                        for (const listener of listeners) {
+                            // TODO (acasey): just run it?
+                            setImmediate(() => {
+                                const result = listener(args);
+                                process.send(result);
+                            });
+                        }
+                    });
                 }
 
                 fork = args => new Promise((resolve, reject) => {
-                    const worker = new _cp.fork(__filename); // TODO (acasey): pool workers
+                    const worker = _cp.fork(__filename); // TODO (acasey): pool workers
 
                     // TODO (acasey): de-dup with thread code
                     let messageListener: (value: any) => void;
@@ -1381,8 +1408,8 @@ namespace ts {
                         return { module: undefined, modulePath: undefined, error };
                     }
                 },
-                isWorker,
-                fork
+                fork,
+                on
             };
             return nodeSystem;
 
