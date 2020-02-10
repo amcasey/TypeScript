@@ -12,7 +12,15 @@ if (ts.sys.setBlocking) {
     ts.sys.setBlocking();
 }
 
-ts.executeCommandLine(ts.sys, ts.noop, ts.sys.args); // TODO (acasey): I don't see how we can honor callbacks in parallel mode - I don't believe they can cross thread boundaries
+// TODO (acasey): fork in a sensible place
+if (ts.sys.isWorker || !ts.sys.fork) {
+    ts.executeCommandLine(ts.sys, ts.noop, ts.sys.args); // TODO (acasey): I don't see how we can honor callbacks in parallel mode - I don't believe they can cross thread boundaries
+}
+else {
+    // TODO (acasey): does this process survive?
+    ts.sys.fork(ts.sys.args).catch(err => { ts.sys.write(err + ts.sys.newLine); });
+}
+
 
 // TODO (acasey): need a way to detect we're a helper thread/process
 //  Build only one project
