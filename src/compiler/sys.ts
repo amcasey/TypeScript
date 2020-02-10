@@ -1123,7 +1123,6 @@ namespace ts {
             const _fs: typeof import("fs") = require("fs");
             const _path: typeof import("path") = require("path");
             const _os = require("os");
-            const _th = require("thread_helper");
             // crypto can be absent on reduced node installations
             let _crypto: typeof import("crypto") | undefined;
             try {
@@ -1131,6 +1130,14 @@ namespace ts {
             }
             catch {
                 _crypto = undefined;
+            }
+            // worker_threads is a relatively new Node PAI
+            let _wt: typeof import("worker_threads") | undefined;
+            try {
+                _wt = require("worker_threads");
+            }
+            catch {
+                _wt = undefined;
             }
             let activeSession: import("inspector").Session | "stopping" | undefined;
             let profilePath = "./profile.cpuprofile";
@@ -1166,14 +1173,16 @@ namespace ts {
                 tscWatchDirectory: process.env.TSC_WATCHDIRECTORY,
             });
 
-            let isWorker: boolean;
-            let fork: (args: string[]) => Promise<void>;
             let args = process.argv.slice(2);
 
-            if (!!_th) {
-                isWorker = !!_th.parentPort;
+            let isWorker: boolean;
+            let fork: (args: string[]) => Promise<void>;
+
+            if (!!_wt) {
+                isWorker = !!_wt.parentPort;
+
                 fork = args => new Promise((resolve, reject) => {
-                    const worker = new _th.Worker(__filename); // TODO (acasey): pool workers
+                    const worker = new _wt!.Worker(__filename); // TODO (acasey): pool workers
 
                     let messageListener: (value: any) => void;
                     let errorListener: (err: Error) => void;
@@ -1210,13 +1219,13 @@ namespace ts {
             }
             else {
                 const _cp = require("child_process");
-                if (args.length > 0) {
-                    isWorker = args[0] === "__helper__";
+
+                isWorker = args.length > 0 && args[0] === "__helper__";
+
+                if (isWorker) {
                     args = args.slice(1);
                 }
-                else {
-                    isWorker = false;
-                }
+
                 fork = args => new Promise((resolve, reject) => {
                     const worker = new _cp.fork(__filename); // TODO (acasey): pool workers
 

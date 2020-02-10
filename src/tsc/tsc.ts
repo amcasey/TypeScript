@@ -18,7 +18,7 @@ if (ts.sys.isWorker || !ts.sys.fork) {
 }
 else {
     // TODO (acasey): does this process survive?
-    ts.sys.fork(ts.sys.args).catch(err => { ts.sys.write(err + ts.sys.newLine); });
+    ts.sys.fork(ts.sys.args).catch(err => { ts.sys.write("Worker error: " + err + ts.sys.newLine); });
 }
 
 
