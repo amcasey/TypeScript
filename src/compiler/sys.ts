@@ -1148,8 +1148,8 @@ namespace ts {
                 from?(input: string, encoding?: string): any;
             } = require("buffer").Buffer;
 
-            const nodeVersion = getNodeMajorVersion();
-            const isNode4OrLater = nodeVersion! >= 4;
+            const nodeVersion = getNodeMajorVersion()!;
+            const isNode4OrLater = nodeVersion >= 4;
             const isLinuxOrMacOs = process.platform === "linux" || process.platform === "darwin";
 
             const platform: string = _os.platform();
@@ -1200,7 +1200,7 @@ namespace ts {
                 }
 
                 fork = args => new Promise((resolve, reject) => {
-                    const worker = new _wt!.Worker(__filename); // TODO (acasey): pool workers
+                    const worker = new _wt!.Worker(__filename); // TODO (acasey): pool workers (and handle teardown)
 
                     let messageListener: (value: any) => void;
                     let errorListener: (err: Error) => void;
@@ -1255,7 +1255,16 @@ namespace ts {
                 }
 
                 fork = args => new Promise((resolve, reject) => {
-                    const worker = _cp.fork(__filename); // TODO (acasey): pool workers
+                    // TODO (acasey): share with server.ts
+                    const childExecArgv = [];
+                    if (!!process.debugPort) {
+                        const execArgv: string[] = process.execArgv;
+                        const breakOnStart = some(execArgv, arg => !!/^--(inspect|debug)-brk/.exec(arg));
+                        if (breakOnStart) {
+                            childExecArgv.push(`--${(nodeVersion >= 8 ? "inspect" : "debug")}${(breakOnStart ? "-brk" : "")}=${+process.debugPort + 1}`);
+                        }
+                    }
+                    const worker = _cp.fork(__filename, ["__helper__"], { execArgv: childExecArgv }); // TODO (acasey): pool workers (and handle teardown)
 
                     // TODO (acasey): de-dup with thread code
                     let messageListener: (value: any) => void;
@@ -1304,7 +1313,7 @@ namespace ts {
                     worker.on("close", closeListener);
                     worker.on("disconnect", disconnectListener);
 
-                    worker.send(["__helper__", ...args], errorListener);
+                    worker.send(args, errorListener);
                 });
             }
 
