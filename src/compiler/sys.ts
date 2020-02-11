@@ -1176,16 +1176,17 @@ namespace ts {
 
             let args = process.argv.slice(2);
 
+            // TODO (acasey): make user opt-in by providing __filename
+
+            let isWorker: boolean;
+
             let fork: (args: string[]) => Promise<void>;
 
             type Listener = (args: string[]) => string | Error;
             const listeners: Listener[] = [];
-            let on = (_event: "parentRequest", listener: Listener) => {
-                listeners.push(listener);
-            };
 
             if (!!_wt) {
-                if (!!_wt.parentPort) {
+                if (isWorker = !!_wt.parentPort) {
                     // TODO (acasey): other handlers?
                     _wt.parentPort.on("message", (args: string[]) => {
                         for (const listener of listeners) {
@@ -1237,7 +1238,7 @@ namespace ts {
             else {
                 const _cp: typeof import("child_process") = require("child_process");
 
-                const isWorker = args.length > 0 && args[0] === "__helper__";
+                isWorker = args.length > 0 && args[0] === "__helper__";
                 if (isWorker) {
                     args = args.slice(1);
 
@@ -1306,6 +1307,10 @@ namespace ts {
                     worker.send(["__helper__", ...args], errorListener);
                 });
             }
+
+            let on = isWorker
+                ? (_event: "parentRequest", listener: Listener) => listeners.push(listener)
+                : undefined;
 
             const nodeSystem: System = {
                 args,
