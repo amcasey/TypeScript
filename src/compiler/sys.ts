@@ -1313,7 +1313,8 @@ namespace ts {
                     worker.on("close", closeListener);
                     worker.on("disconnect", disconnectListener);
 
-                    worker.send(args, errorListener);
+                    // A non-null argument to the callback indicates a communication error
+                    worker.send(args, errOpt => errOpt && errorListener(errOpt));
                 });
             }
 
