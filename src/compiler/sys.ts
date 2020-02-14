@@ -1170,20 +1170,20 @@ namespace ts {
                 getAccessibleSortedChildDirectories: path => getAccessibleFileSystemEntries(path).directories,
                 realpath,
                 tscWatchFile: process.env.TSC_WATCHFILE,
-                useNonPollingWatchers: process.env.TSC_NONPOLLING_WATCHER,
+                useNonPollingWatchers: !!process.env.TSC_NONPOLLING_WATCHER,
                 tscWatchDirectory: process.env.TSC_WATCHDIRECTORY,
             });
 
             let args = process.argv.slice(2);
 
-            // TODO (acasey): make user opt-in by providing __filename
+            // TODO (acasey): make user opt-in by providing __filename?
 
             let isWorker: boolean;
 
             let fork: (args: string[]) => Promise<void>;
 
             type Listener = (args: string[]) => string | Error;
-            const listeners: Listener[] = [];
+            const listeners: Listener[] = []; // TODO (acasey): limit length?
 
             if (!!_wt) {
                 if (isWorker = !!_wt.parentPort) {
@@ -1248,7 +1248,7 @@ namespace ts {
                             // TODO (acasey): just run it?
                             setImmediate(() => {
                                 const result = listener(args);
-                                process.send(result);
+                                process.send!(result); // TODO (acasey): check availability of send?
                             });
                         }
                     });
@@ -1322,6 +1322,10 @@ namespace ts {
                 ? (_event: "parentRequest", listener: Listener) => listeners.push(listener)
                 : undefined;
 
+            let processExit: (exitCode?: number) => void = isWorker
+                ? exitCode => { throw new ExitException(exitCode); }
+                : exitCode => process.exit(exitCode);
+
             const nodeSystem: System = {
                 args,
                 newLine: _os.EOL,
@@ -1387,9 +1391,9 @@ namespace ts {
                     return 0;
                 },
                 exit(exitCode?: number): void {
-                    disableCPUProfiler(() => process.exit(exitCode));
+                    disableCPUProfiler(() => processExit(exitCode));
                 },
-                enableCPUProfiler,
+                enableCPUProfiler, // TODO (acasey): probably doesn't make sense in multi-process case (fine with threads?)
                 disableCPUProfiler,
                 realpath,
                 debugMode: some(<string[]>process.execArgv, arg => /^--(inspect|debug)(-brk)?(=\d+)?$/i.test(arg)),

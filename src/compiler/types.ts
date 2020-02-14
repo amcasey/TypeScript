@@ -6639,4 +6639,12 @@ namespace ts {
         negative: boolean;
         base10Value: string;
     }
+
+    export class ExitException {
+        readonly exitCode?: number;
+
+        constructor(exitCode?: number) {
+            this.exitCode = exitCode;
+        }
+    }
 }

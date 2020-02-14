@@ -12,14 +12,23 @@ if (ts.sys.setBlocking) {
     ts.sys.setBlocking();
 }
 
-// TODO (acasey): handle forking in a sensible place
 if (ts.sys.on) {
+    // TODO (acasey): hijack sys.exit?
     ts.sys.on("parentRequest", args => {
-        ts.executeCommandLine(ts.sys, ts.noop, args); // TODO (acasey): I don't see how we can honor callbacks in parallel mode - I don't believe they can cross thread boundaries
-        return "done"; // TODO (acasey): real return
+        try {
+            ts.executeCommandLine(ts.sys, ts.noop, args); // TODO (acasey): I don't see how we can honor callbacks in parallel mode - I don't believe they can cross thread boundaries
+            return "done"; // TODO (acasey): real return
+        }
+        catch(e) {
+            if (e instanceof ts.ExitException) {
+                return "exited"; // TODO (acasey): exit code
+            }
+            return JSON.stringify(e); // TODO (acasey): error handling
+        }
     });
 }
 else if (ts.sys.fork) {
+    // TODO (acasey): This should be in build mode and for specific projects
     ts.sys.fork(ts.sys.args).catch(err => { ts.sys.write("Worker error: " + err + ts.sys.newLine); });
 }
 else {
