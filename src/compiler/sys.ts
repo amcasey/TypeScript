@@ -1077,7 +1077,7 @@ namespace ts {
         /*@internal*/ now?(): Date;
         /*@internal*/ require?(baseDir: string, moduleName: string): RequireResult;
 
-        /*@internal*/ fork?(args: string[]): Promise<void>;
+        /*@internal*/ fork?(args: string[]): Promise<void>; // TODO (acasey): probably needs an exit code
         /*@internal*/ on?: (event: "parentRequest", listener: (args: string[]) => string | Error) => void;
 
     }

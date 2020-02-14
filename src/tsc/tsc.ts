@@ -29,7 +29,9 @@ if (ts.sys.on) {
 }
 else if (ts.sys.fork) {
     // TODO (acasey): This should be in build mode and for specific projects
-    ts.sys.fork(ts.sys.args).catch(err => { ts.sys.write("Worker error: " + err + ts.sys.newLine); });
+    ts.sys.fork(ts.sys.args).then(
+        () => ts.sys.exit(0),
+        err => { ts.sys.write("Worker error: " + err + ts.sys.newLine); });
 }
 else {
     ts.executeCommandLine(ts.sys, ts.noop, ts.sys.args);
