@@ -1119,7 +1119,7 @@ namespace ts {
         // not actually work.
         const byteOrderMarkIndicator = "\uFEFF";
 
-        function getNodeSystem(): System {
+        function getNodeSystem(process: typeof import("process")): System {
             const nativePattern = /^native |^\([^)]+\)$|^(internal[\\/]|[a-zA-Z0-9_\s]+(\.js)?$)/;
             const _fs: typeof import("fs") = require("fs");
             const _path: typeof import("path") = require("path");
@@ -1411,8 +1411,9 @@ namespace ts {
                     process.stdout.write("\x1Bc");
                 },
                 setBlocking: () => {
-                    if (process.stdout && process.stdout._handle && process.stdout._handle.setBlocking) {
-                        process.stdout._handle.setBlocking(true);
+                    const stdout: any = process.stdout;
+                    if (stdout && stdout._handle && stdout._handle.setBlocking) {
+                        stdout._handle.setBlocking(true);
                     }
                 },
                 bufferFrom,
@@ -1883,7 +1884,7 @@ namespace ts {
         if (typeof process !== "undefined" && process.nextTick && !process.browser && typeof require !== "undefined") {
             // process and process.nextTick checks if current environment is node-like
             // process.browser check excludes webpack and browserify
-            sys = getNodeSystem();
+            sys = getNodeSystem(process);
         }
         if (sys) {
             // patch writefile to create folder before writing the file
