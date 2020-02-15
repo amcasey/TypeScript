@@ -1069,7 +1069,7 @@ namespace ts {
         setTimeout?(callback: (...args: any[]) => void, ms: number, ...args: any[]): any;
         clearTimeout?(timeoutId: any): void;
         clearScreen?(): void;
-        /*@internal*/ setBlocking?(): void; // TODO (acasey): what is this? (A: it makes *console.log* blocking)
+        /*@internal*/ setBlocking?(): void;
         base64decode?(input: string): string;
         base64encode?(input: string): string;
         /*@internal*/ bufferFrom?(input: string, encoding?: string): Buffer;
@@ -1077,7 +1077,7 @@ namespace ts {
         /*@internal*/ now?(): Date;
         /*@internal*/ require?(baseDir: string, moduleName: string): RequireResult;
 
-        /*@internal*/ fork?(args: string[]): Promise<ForkResult>; // TODO (acasey): probably needs an exit code
+        /*@internal*/ fork?(args: string[]): Promise<ForkResult>;
         /*@internal*/ on?: (event: "parentRequest", listener: (args: string[]) => number) => void;
 
     }
@@ -1225,10 +1225,10 @@ namespace ts {
                         worker.removeListener("exit", exitListener);
                     };
 
-                    messageListener = value => {
+                    messageListener = (result: ForkResult) => {
                         // TODO (acasey): return ID for confirming order?
                         removeListeners();
-                        resolve(value);
+                        resolve(result);
                     };
 
                     errorListener = err => {
@@ -1297,10 +1297,10 @@ namespace ts {
                         worker.removeListener("disconnect", disconnectListener);
                     };
 
-                    messageListener = value => {
+                    messageListener = (result: ForkResult) => {
                         // TODO (acasey): return ID for confirming order?
                         removeListeners();
-                        resolve(value);
+                        resolve(result);
                     };
 
                     errorListener = err => {

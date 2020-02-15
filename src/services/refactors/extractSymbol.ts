@@ -852,7 +852,7 @@ namespace ts.refactor.extractSymbol {
                 newNodes.push(createVariableStatement(
                     /*modifiers*/ undefined,
                     createVariableDeclarationList(
-                        [createVariableDeclaration(getSynthesizedDeepClone(variableDeclaration.name), /*type*/ getSynthesizedDeepClone(variableDeclaration.type), /*initializer*/ call)], // TODO (acasey): test binding patterns
+                        [createVariableDeclaration(getSynthesizedDeepClone(variableDeclaration.name), /*type*/ getSynthesizedDeepClone(variableDeclaration.type), /*initializer*/ call)],
                         variableDeclaration.parent.flags)));
             }
             else {
