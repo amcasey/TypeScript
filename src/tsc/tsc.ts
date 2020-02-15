@@ -27,12 +27,6 @@ if (ts.sys.on) {
         }
     });
 }
-else if (ts.sys.fork) {
-    // TODO (acasey): This should be in build mode and for specific projects
-    ts.sys.fork(ts.sys.args).then(
-        result => { ts.sys.write(result.stdout); ts.sys.exit(result.exitCode); },
-        err => { ts.sys.write("Worker error: " + err + ts.sys.newLine); });
-}
 else {
     ts.executeCommandLine(ts.sys, ts.noop, ts.sys.args);
 }

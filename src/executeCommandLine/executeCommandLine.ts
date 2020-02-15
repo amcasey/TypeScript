@@ -418,6 +418,14 @@ namespace ts {
         projects: string[],
         errors: Diagnostic[]
     ) {
+        // TODO (acasey): push down
+        if (!ts.sys.on && sys.fork) {
+            sys.fork(ts.sys.args).then(
+                result => { ts.sys.write(result.stdout); ts.sys.exit(result.exitCode); },
+                err => { ts.sys.write("Worker error: " + err + ts.sys.newLine); });
+            return;
+        }
+
         // Update to pretty if host supports it
         const reportDiagnostic = updateReportDiagnostic(
             sys,
