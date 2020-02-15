@@ -1077,9 +1077,16 @@ namespace ts {
         /*@internal*/ now?(): Date;
         /*@internal*/ require?(baseDir: string, moduleName: string): RequireResult;
 
-        /*@internal*/ fork?(args: string[]): Promise<void>; // TODO (acasey): probably needs an exit code
-        /*@internal*/ on?: (event: "parentRequest", listener: (args: string[]) => string | Error) => void;
+        /*@internal*/ fork?(args: string[]): Promise<ForkResult>; // TODO (acasey): probably needs an exit code
+        /*@internal*/ on?: (event: "parentRequest", listener: (args: string[]) => number) => void;
 
+    }
+
+    /*@internal*/
+    export interface ForkResult {
+        exitCode: number;
+        stdout: string; // TODO (acasey): type
+        // TODO (acasey): structured error?
     }
 
     export interface FileWatcher {
@@ -1180,10 +1187,13 @@ namespace ts {
 
             let isWorker: boolean;
 
-            let fork: (args: string[]) => Promise<void>;
+            let fork: (args: string[]) => Promise<ForkResult>;
 
-            type Listener = (args: string[]) => string | Error;
+            type Listener = (args: string[]) => number;
             const listeners: Listener[] = []; // TODO (acasey): limit length?
+
+            // TODO (acasey): smarter string builder?
+            let workerOutput = "";
 
             if (!!_wt) {
                 if (isWorker = !!_wt.parentPort) {
@@ -1192,8 +1202,11 @@ namespace ts {
                         for (const listener of listeners) {
                             // TODO (acasey): just run it?
                             setImmediate(() => {
-                                const result = listener(args);
-                                _wt!.parentPort!.postMessage(result);
+                                const exitCode = listener(args);
+                                _wt!.parentPort!.postMessage({
+                                    exitCode,
+                                    stdout: workerOutput
+                                } as ForkResult);
                             });
                         }
                     });
@@ -1212,10 +1225,10 @@ namespace ts {
                         worker.removeListener("exit", exitListener);
                     };
 
-                    messageListener = (_value) => {
+                    messageListener = value => {
                         // TODO (acasey): return ID for confirming order?
                         removeListeners();
-                        resolve();
+                        resolve(value);
                     };
 
                     errorListener = err => {
@@ -1247,8 +1260,11 @@ namespace ts {
                         for (const listener of listeners) {
                             // TODO (acasey): just run it?
                             setImmediate(() => {
-                                const result = listener(args);
-                                process.send!(result); // TODO (acasey): check availability of send?
+                                const exitCode = listener(args);
+                                process.send!({
+                                    exitCode,
+                                    stdout: workerOutput
+                                } as ForkResult);
                             });
                         }
                     });
@@ -1281,10 +1297,10 @@ namespace ts {
                         worker.removeListener("disconnect", disconnectListener);
                     };
 
-                    messageListener = (_value) => {
+                    messageListener = value => {
                         // TODO (acasey): return ID for confirming order?
                         removeListeners();
-                        resolve();
+                        resolve(value);
                     };
 
                     errorListener = err => {
@@ -1326,15 +1342,18 @@ namespace ts {
                 ? exitCode => { throw new ExitException(exitCode); }
                 : exitCode => process.exit(exitCode);
 
+            // TODO (acasey): use types that worker threads can transfer
+            let write: (s: string) => void = isWorker
+                ? s => workerOutput = workerOutput.concat(s)
+                : s => process.stdout.write(s);
+
             const nodeSystem: System = {
                 args,
                 newLine: _os.EOL,
                 useCaseSensitiveFileNames,
-                write(s: string): void {
-                    process.stdout.write(s);
-                },
+                write,
                 writeOutputIsTTY() {
-                    return process.stdout.isTTY;
+                    return !isWorker && process.stdout.isTTY;
                 },
                 readFile,
                 writeFile,

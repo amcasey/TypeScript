@@ -17,20 +17,21 @@ if (ts.sys.on) {
     ts.sys.on("parentRequest", args => {
         try {
             ts.executeCommandLine(ts.sys, ts.noop, args); // TODO (acasey): I don't see how we can honor callbacks in parallel mode - I don't believe they can cross thread boundaries
-            return "done"; // TODO (acasey): real return
+            return ts.ExitStatus.Success;
         }
         catch(e) {
             if (e instanceof ts.ExitException) {
-                return "exited"; // TODO (acasey): exit code
+                return e.exitCode ?? ts.ExitStatus.Success;
             }
-            return JSON.stringify(e); // TODO (acasey): error handling
+            ts.sys.write(e); // TODO (acasey): error handling
+            return -1; // TODO (acasey): enum value?
         }
     });
 }
 else if (ts.sys.fork) {
     // TODO (acasey): This should be in build mode and for specific projects
     ts.sys.fork(ts.sys.args).then(
-        () => ts.sys.exit(0),
+        result => { ts.sys.write(result.stdout); ts.sys.exit(result.exitCode); },
         err => { ts.sys.write("Worker error: " + err + ts.sys.newLine); });
 }
 else {
