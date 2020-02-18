@@ -600,9 +600,9 @@ namespace ts {
     }
 
     export enum InvalidatedProjectKind {
-        Build,
-        UpdateBundle,
-        UpdateOutputFileStamps
+        Build, // TODO (acasey): fork this
+        UpdateBundle, // TODO (acasey): probably not interesting to fork - just IO?
+        UpdateOutputFileStamps // TODO (acasey): not interesting to fork
     }
 
     export interface InvalidatedProjectBase {
@@ -613,7 +613,7 @@ namespace ts {
         /**
          *  To dispose this project and ensure that all the necessary actions are taken and state is updated accordingly
          */
-        done(cancellationToken?: CancellationToken, writeFile?: WriteFileCallback, customTransformers?: CustomTransformers): ExitStatus;
+        done(cancellationToken?: CancellationToken, writeFile?: WriteFileCallback, customTransformers?: CustomTransformers): ExitStatus; // TODO (acasey): it's not clear how transformers could be supported - maybe they could have identifiers
         getCompilerOptions(): CompilerOptions;
         getCurrentDirectory(): string;
     }
@@ -723,6 +723,8 @@ namespace ts {
         let buildResult: BuildResultFlags | undefined;
         let invalidatedProjectOfBundle: BuildInvalidedProject<T> | undefined;
 
+        // TODO (acasey): I believe this is the object we want to build in the worker
+        // TODO (acasey): it needs to be split so that any side effects happen in the parent
         return kind === InvalidatedProjectKind.Build ?
             {
                 kind,
@@ -800,9 +802,11 @@ namespace ts {
                 done,
             };
 
+        // TODO (acasey): seems like the only way to handle custom file writing (why does this exist? why isn't it on the host?)
+        // is to have the worker return the contents - seems like an awful lot of data.
         function done(cancellationToken?: CancellationToken, writeFile?: WriteFileCallback, customTransformers?: CustomTransformers) {
-            executeSteps(Step.Done, cancellationToken, writeFile, customTransformers);
-            return doneInvalidatedProject(state, projectPath);
+            executeSteps(Step.Done, cancellationToken, writeFile, customTransformers); // TODO (acasey): in worker
+            return doneInvalidatedProject(state, projectPath); // TODO (acasey): in parent
         }
 
         function withProgramOrUndefined<U>(action: (program: T) => U | undefined): U | undefined {
@@ -1133,7 +1137,7 @@ namespace ts {
         for (let projectIndex = 0; projectIndex < buildOrder.length; projectIndex++) {
             const project = buildOrder[projectIndex];
             const projectPath = toResolvedConfigFilePath(state, project);
-            const reloadLevel = state.projectPendingBuild.get(projectPath);
+            const reloadLevel = state.projectPendingBuild.get(projectPath); // TODO (acasey): can this be leveraged to detect whether dependencies are ready?
             if (reloadLevel === undefined) continue;
 
             if (reportQueue) {
