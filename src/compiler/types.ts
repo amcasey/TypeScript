@@ -5807,6 +5807,7 @@ namespace ts {
         incremental?: boolean;
         tsBuildInfoFile?: string;
         removeComments?: boolean;
+        resolutionPlatforms?: string[]; // Use react-native lookup logic for these platforms
         rootDir?: string;
         rootDirs?: string[];
         skipLibCheck?: boolean;

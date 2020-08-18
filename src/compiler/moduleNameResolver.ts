@@ -1,4 +1,8 @@
 namespace ts {
+
+    const _fs: typeof import("fs") = require("fs");
+    const env_resolution_platforms = process.env['RESOLUTION_PLATFORMS'] && JSON.parse(process.env['RESOLUTION_PLATFORMS']);
+
     /* @internal */
     export function trace(host: ModuleResolutionHost, message: DiagnosticMessage, ...args: any[]): void;
     export function trace(host: ModuleResolutionHost): void {
@@ -1060,13 +1064,38 @@ namespace ts {
      * in cases when we know upfront that all load attempts will fail (because containing folder does not exists) however we still need to record all failed lookup locations.
      */
     function loadModuleFromFile(extensions: Extensions, candidate: string, onlyRecordFailures: boolean, state: ModuleResolutionState): PathAndExtension | undefined {
+        if (!onlyRecordFailures) {
+            // check if containing folder exists - if it doesn't then just record failures for all supported extensions without disk probing
+            const directory = getDirectoryPath(candidate);
+            if (directory) {
+                onlyRecordFailures = !directoryProbablyExists(directory, state.host);
+            }
+        }
+
+        let customFileExists: ((path: string) => boolean) | undefined;
+        if (!onlyRecordFailures) {
+            try {
+                const dir = getDirectoryPath(candidate);
+                const existingFiles = new Set<string>(); // TODO (acasey): handle missing functionality
+                for (const entry of _fs.readdirSync(dir, { withFileTypes: true })) {
+                    if (entry.isFile()) {
+                        existingFiles.add(`${dir}/${entry.name}`);
+                    }
+                }
+                customFileExists = path => existingFiles.has(path);
+            }
+            catch {
+                // If the containing folder doesn't exist, act as though onlyRecordFailures were true
+            }
+        }
+
         if (extensions === Extensions.Json || extensions === Extensions.TSConfig) {
             const extensionLess = tryRemoveExtension(candidate, Extension.Json);
-            return (extensionLess === undefined && extensions === Extensions.Json) ? undefined : tryAddingExtensions(extensionLess || candidate, extensions, onlyRecordFailures, state);
+            return (extensionLess === undefined && extensions === Extensions.Json) ? undefined : tryAddingExtensions(extensionLess || candidate, extensions, onlyRecordFailures, state, customFileExists);
         }
 
         // First, try adding an extension. An import of "foo" could be matched by a file "foo.ts", or "foo.js" by "foo.js.ts"
-        const resolvedByAddingExtension = tryAddingExtensions(candidate, extensions, onlyRecordFailures, state);
+        const resolvedByAddingExtension = tryAddingExtensions(candidate, extensions, onlyRecordFailures, state, customFileExists);
         if (resolvedByAddingExtension) {
             return resolvedByAddingExtension;
         }
@@ -1079,20 +1108,12 @@ namespace ts {
                 const extension = candidate.substring(extensionless.length);
                 trace(state.host, Diagnostics.File_name_0_has_a_1_extension_stripping_it, candidate, extension);
             }
-            return tryAddingExtensions(extensionless, extensions, onlyRecordFailures, state);
+            return tryAddingExtensions(extensionless, extensions, onlyRecordFailures, state, customFileExists);
         }
     }
 
     /** Try to return an existing file that adds one of the `extensions` to `candidate`. */
-    function tryAddingExtensions(candidate: string, extensions: Extensions, onlyRecordFailures: boolean, state: ModuleResolutionState): PathAndExtension | undefined {
-        if (!onlyRecordFailures) {
-            // check if containing folder exists - if it doesn't then just record failures for all supported extensions without disk probing
-            const directory = getDirectoryPath(candidate);
-            if (directory) {
-                onlyRecordFailures = !directoryProbablyExists(directory, state.host);
-            }
-        }
-
+    function tryAddingExtensions(candidate: string, extensions: Extensions, onlyRecordFailures: boolean, state: ModuleResolutionState, customFileExists?: (path: string) => boolean): PathAndExtension | undefined {
         switch (extensions) {
             case Extensions.DtsOnly:
                 return tryExtension(Extension.Dts);
@@ -1106,29 +1127,67 @@ namespace ts {
         }
 
         function tryExtension(ext: Extension): PathAndExtension | undefined {
-            const path = tryFile(candidate + ext, onlyRecordFailures, state);
+            const path = tryFile(candidate + ext, onlyRecordFailures, state, customFileExists);
             return path === undefined ? undefined : { path, ext };
         }
     }
 
     /** Return the file if it exists. */
-    function tryFile(fileName: string, onlyRecordFailures: boolean, state: ModuleResolutionState): string | undefined {
-        if (!onlyRecordFailures) {
-            if (state.host.fileExists(fileName)) {
-                if (state.traceEnabled) {
-                    trace(state.host, Diagnostics.File_0_exist_use_it_as_a_name_resolution_result, fileName);
-                }
-                return fileName;
-            }
-            else {
-                if (state.traceEnabled) {
-                    trace(state.host, Diagnostics.File_0_does_not_exist, fileName);
+    function tryFile(file: string, onlyRecordFailures: boolean, state: ModuleResolutionState, customFileExists?: (path: string) => boolean): string | undefined {
+
+        /* 
+         * For more context about platform forking: https://github.com/microsoft/TypeScript/issues/17681
+         *
+         * The resolution platform env variable or configuration is a list of string. eg. ['ios', 'mobile', 'native']
+         * It describes the priority of the modules to resolve. eg. try index.ios.ts, then try index.mobile.ts, then try index.native.ts, then try index.ts.
+         * 
+         * The environment variable is set when working in VSCode and applies to all the projects. It is set according to the platform a given dev works on.
+         *   This scenario works well, it provides accurate type checking in good F12 experience.
+         * The compiler option is set separately for each project, this is used for building. A project will list all the extensions it contains. eg. ['ios', 'mobile', 'web'].
+         *   This scenario does not work very well, type checking is not accurate but at least tsc will always manage to resolve one module.
+         */
+        const resolution_platforms = env_resolution_platforms || state.compilerOptions.resolutionPlatforms;
+        if (resolution_platforms) {
+            for (let platform of resolution_platforms) {
+                let result = tryFileForPlatform(platform);
+                if (result) {
+                    return result;
                 }
             }
         }
-        state.failedLookupLocations.push(fileName);
-        return undefined;
-    }
+        return tryFileForPlatform();
+        
+        function tryFileForPlatform(platform?: string): string | undefined {
+            let fileName = file;
+            if (platform) {
+                // This piece of code is to prevent TS from trying to resolve index.d.web.ts instead of index.web.d.ts.
+                const forkableExtensions = [".d.ts", ".tsx", ".ts", ".json", ".js"];
+                for (const extension of forkableExtensions) {
+                    if (file.endsWith(extension)) {
+                        fileName = file.slice(0, file.length - extension.length) + `.${platform}${extension}`
+                        break;
+                    }
+                }
+            }
+
+            if (!onlyRecordFailures) {
+                if (customFileExists ? customFileExists(fileName) : state.host.fileExists(fileName)) {
+                    if (state.traceEnabled) {
+                        trace(state.host, Diagnostics.File_0_exist_use_it_as_a_name_resolution_result, fileName);
+                    }
+                    return fileName;
+                }
+                else {
+                if (state.traceEnabled) {
+                    trace(state.host, Diagnostics.File_0_does_not_exist, fileName);
+                    }
+                }
+            }
+
+            state.failedLookupLocations.push(fileName);
+            return undefined;
+        }   
+    }   
 
     function loadNodeModuleFromDirectory(extensions: Extensions, candidate: string, onlyRecordFailures: boolean, state: ModuleResolutionState, considerPackageJson = true) {
         const packageInfo = considerPackageJson ? getPackageJsonInfo(candidate, onlyRecordFailures, state) : undefined;
