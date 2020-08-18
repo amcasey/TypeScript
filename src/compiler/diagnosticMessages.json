@@ -5432,6 +5432,10 @@
         "category": "Message",
         "code": 95031
     },
+    "List of platform extensions to fallback on": {
+        "category": "Message",
+        "code": 910044
+    },
     "Implement all unimplemented interfaces": {
         "category": "Message",
         "code": 95032
