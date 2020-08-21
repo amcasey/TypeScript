@@ -1111,6 +1111,17 @@ namespace ts {
     /** Return the file if it exists. */
     function tryFile(file: string, onlyRecordFailures: boolean, state: ModuleResolutionState): string | undefined {
 
+        /* 
+         * For more context about platform forking: https://github.com/microsoft/TypeScript/issues/17681
+         *
+         * The resolution platform env variable or configuration is a list of string. eg. ['ios', 'mobile', 'native']
+         * It describes the priority of the modules to resolve. eg. try index.ios.ts, then try index.mobile.ts, then try index.native.ts, then try index.ts.
+         * 
+         * The environment variable is set when working in VSCode and applies to all the projects. It is set according to the platform a given dev works on.
+         *   This scenario works well, it provides accurate type checking in good F12 experience.
+         * The compiler option is set separately for each project, this is used for building. A project will list all the extensions it contains. eg. ['ios', 'mobile', 'web'].
+         *   This scenario does not work very well, type checking is not accurate but at least tsc will always manage to resolve one module.
+         */
         const resolution_platforms = (
 	(process.env['RESOLUTION_PLATFORMS'] && JSON.parse(process.env['RESOLUTION_PLATFORMS']))
 	    || state.compilerOptions.resolutionPlatforms);
@@ -1127,6 +1138,7 @@ namespace ts {
         function tryFileForPlatform(platform?: string): string | undefined {
             let fileName = file;
             if (platform) {
+                // This piece of code is to prevent TS from trying to resolve index.d.web.ts instead of index.web.d.ts.
                 const forkableExtensions = [".d.ts", ".tsx", ".ts", ".json", ".js"];
                 for (const extension of forkableExtensions) {
                     if (file.endsWith(extension)) {
