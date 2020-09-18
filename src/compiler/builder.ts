@@ -7,6 +7,7 @@ namespace ts {
         source?: string;
         relatedInformation?: ReusableDiagnosticRelatedInformation[];
         skippedOn?: keyof CompilerOptions;
+        dummy?: never;
     }
 
     export interface ReusableDiagnosticRelatedInformation {
