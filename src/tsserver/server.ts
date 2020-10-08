@@ -567,6 +567,7 @@ namespace ts.server {
         }
 
         exit() {
+            ts.tracing.stopTracing([]); // TODO (acasey): type catalog
             this.logger.info("Exiting...");
             this.projectService.closeLog();
             process.exit(0);
@@ -981,6 +982,8 @@ namespace ts.server {
     const serverMode = parseServerMode();
     const telemetryEnabled = hasArgument(Arguments.EnableTelemetry);
     const noGetErrOnBackgroundUpdate = hasArgument("--noGetErrOnBackgroundUpdate");
+
+    ts.tracing.startTracing("server", `C:\\tmp\\Feedback\\Midgard\\trace${process.pid}`, /*isBuildMode*/ false);
 
     logger.info(`Starting TS Server`);
     logger.info(`Version: ${version}`);

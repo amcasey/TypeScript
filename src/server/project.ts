@@ -992,7 +992,9 @@ namespace ts.server {
             perfLogger.logStartUpdateGraph();
             this.resolutionCache.startRecordingFilesWithChangedResolutions();
 
+            tracing.begin(tracing.Phase.Program, "updateGraphWorker", { project: this.getProjectName(), hasProgram: !!this.program });
             const hasNewProgram = this.updateGraphWorker();
+            tracing.end();
             const hasAddedorRemovedFiles = this.hasAddedorRemovedFiles;
             this.hasAddedorRemovedFiles = false;
 
@@ -1068,7 +1070,9 @@ namespace ts.server {
             this.resolutionCache.startCachingPerDirectoryResolution();
             this.program = this.languageService.getProgram()!; // TODO: GH#18217
             this.dirty = false;
+            tracing.begin(tracing.Phase.Program, "finishCachingPerDirectoryResolution", {});
             this.resolutionCache.finishCachingPerDirectoryResolution();
+            tracing.end();
 
             Debug.assert(oldProgram === undefined || this.program !== undefined);
 
@@ -1094,6 +1098,7 @@ namespace ts.server {
                     });
                 }
 
+                tracing.begin(tracing.Phase.Program, "updateMissingFilePathsWatch", {});
                 // Update the missing file paths watcher
                 updateMissingFilePathsWatch(
                     this.program,
@@ -1101,6 +1106,7 @@ namespace ts.server {
                     // Watch the missing files
                     missingFilePath => this.addMissingFileWatcher(missingFilePath)
                 );
+                tracing.end();
 
                 if (this.generatedFilesMap) {
                     const outPath = outFile(this.compilerOptions);
@@ -1142,6 +1148,7 @@ namespace ts.server {
             }
 
             if (!this.importSuggestionsCache.isEmpty()) {
+                tracing.begin(tracing.Phase.Program, "importSuggestionsCache", {});
                 if (this.hasAddedorRemovedFiles || oldProgram && !oldProgram.structureIsReused) {
                     this.importSuggestionsCache.clear();
                 }
@@ -1155,6 +1162,7 @@ namespace ts.server {
                         }
                     });
                 }
+                tracing.end();
             }
             if (this.dirtyFilesForSuggestions) {
                 this.dirtyFilesForSuggestions.clear();
