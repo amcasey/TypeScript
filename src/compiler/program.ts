@@ -820,16 +820,21 @@ namespace ts {
             forEachResolvedProjectReference
         });
 
+        tracing.begin(tracing.Phase.Program, "shouldProgramCreateNewSourceFiles", { hasOldProgram: !!oldProgram });
         const shouldCreateNewSourceFile = shouldProgramCreateNewSourceFiles(oldProgram, options);
+        tracing.end();
         // We set `structuralIsReused` to `undefined` because `tryReuseStructureFromOldProgram` calls `tryReuseStructureFromOldProgram` which checks
         // `structuralIsReused`, which would be a TDZ violation if it was not set in advance to `undefined`.
         let structuralIsReused: StructureIsReused | undefined;
+        tracing.begin(tracing.Phase.Program, "tryReuseStructureFromOldProgram", {});
         structuralIsReused = tryReuseStructureFromOldProgram(); // eslint-disable-line prefer-const
+        tracing.end();
         if (structuralIsReused !== StructureIsReused.Completely) {
             processingDefaultLibFiles = [];
             processingOtherFiles = [];
 
             if (projectReferences) {
+                tracing.begin(tracing.Phase.Program, "createProgramA", { });
                 if (!resolvedProjectReferences) {
                     resolvedProjectReferences = projectReferences.map(parseProjectReferenceConfigFile);
                 }
@@ -858,10 +863,14 @@ namespace ts {
                         }
                     }
                 }
+                tracing.end();
             }
 
+            tracing.begin(tracing.Phase.Program, "createProgramB", { });
             forEach(rootNames, name => processRootFile(name, /*isDefaultLib*/ false, /*ignoreNoDefaultLib*/ false));
+            tracing.end();
 
+            tracing.begin(tracing.Phase.Program, "createProgramC", { });
             // load type declarations specified via 'types' argument or implicitly from types/ and node_modules/@types folders
             const typeReferences: string[] = rootNames.length ? getAutomaticTypeDirectiveNames(options, host) : emptyArray;
 
@@ -897,6 +906,7 @@ namespace ts {
             files = stableSort(processingDefaultLibFiles, compareDefaultLibFiles).concat(processingOtherFiles);
             processingDefaultLibFiles = undefined;
             processingOtherFiles = undefined;
+            tracing.end();
         }
 
         Debug.assert(!!missingFilePaths);
@@ -2337,6 +2347,18 @@ namespace ts {
 
         // Get source file from normalized fileName
         function findSourceFile(fileName: string, path: Path, isDefaultLib: boolean, ignoreNoDefaultLib: boolean, refFile: RefFile | undefined, packageId: PackageId | undefined): SourceFile | undefined {
+            tracing.begin(tracing.Phase.Program, "findSourceFile", {
+                fileName,
+                isDefaultLib,
+                refKind: refFile?.kind,
+                refPath: refFile?.file.path,
+            });
+            const result = findSourceFileWorker(fileName, path, isDefaultLib, ignoreNoDefaultLib, refFile, packageId);
+            tracing.end();
+            return result;
+        }
+
+        function findSourceFileWorker(fileName: string, path: Path, isDefaultLib: boolean, ignoreNoDefaultLib: boolean, refFile: RefFile | undefined, packageId: PackageId | undefined): SourceFile | undefined {
             if (useSourceOfProjectReferenceRedirect) {
                 let source = getSourceOfProjectReferenceRedirect(fileName);
                 // If preserveSymlinks is true, module resolution wont jump the symlink
@@ -2707,6 +2729,16 @@ namespace ts {
         }
 
         function processTypeReferenceDirective(
+            typeReferenceDirective: string,
+            resolvedTypeReferenceDirective?: ResolvedTypeReferenceDirective,
+            refFile?: RefFile
+        ): void {
+            tracing.begin(tracing.Phase.Program, "processTypeReferenceDirective", { directive: typeReferenceDirective, hasResolved: !!resolveModuleNamesReusingOldState, refKind: refFile?.kind, refPath: refFile?.file.path });
+            processTypeReferenceDirectiveWorker(typeReferenceDirective, resolvedTypeReferenceDirective, refFile);
+            tracing.end();
+        }
+
+        function processTypeReferenceDirectiveWorker(
             typeReferenceDirective: string,
             resolvedTypeReferenceDirective?: ResolvedTypeReferenceDirective,
             refFile?: RefFile
