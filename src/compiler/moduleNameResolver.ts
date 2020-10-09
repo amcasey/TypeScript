@@ -1,4 +1,8 @@
 namespace ts {
+
+    const _fs: typeof import("fs") = require("fs");
+    const env_resolution_platforms = process.env['RESOLUTION_PLATFORMS'] && JSON.parse(process.env['RESOLUTION_PLATFORMS']);
+
     /* @internal */
     export function trace(host: ModuleResolutionHost, message: DiagnosticMessage, ...args: any[]): void;
     export function trace(host: ModuleResolutionHost): void {
@@ -1060,13 +1064,38 @@ namespace ts {
      * in cases when we know upfront that all load attempts will fail (because containing folder does not exists) however we still need to record all failed lookup locations.
      */
     function loadModuleFromFile(extensions: Extensions, candidate: string, onlyRecordFailures: boolean, state: ModuleResolutionState): PathAndExtension | undefined {
+        if (!onlyRecordFailures) {
+            // check if containing folder exists - if it doesn't then just record failures for all supported extensions without disk probing
+            const directory = getDirectoryPath(candidate);
+            if (directory) {
+                onlyRecordFailures = !directoryProbablyExists(directory, state.host);
+            }
+        }
+
+        let customFileExists: ((path: string) => boolean) | undefined;
+        if (!onlyRecordFailures) {
+            try {
+                const dir = getDirectoryPath(candidate);
+                const existingFiles = new Set<string>(); // TODO (acasey): handle missing functionality
+                for (const entry of _fs.readdirSync(dir, { withFileTypes: true })) {
+                    if (entry.isFile()) {
+                        existingFiles.add(`${dir}/${entry.name}`);
+                    }
+                }
+                customFileExists = path => existingFiles.has(path);
+            }
+            catch {
+                // If the containing folder doesn't exist, act as though onlyRecordFailures were true
+            }
+        }
+
         if (extensions === Extensions.Json || extensions === Extensions.TSConfig) {
             const extensionLess = tryRemoveExtension(candidate, Extension.Json);
-            return (extensionLess === undefined && extensions === Extensions.Json) ? undefined : tryAddingExtensions(extensionLess || candidate, extensions, onlyRecordFailures, state);
+            return (extensionLess === undefined && extensions === Extensions.Json) ? undefined : tryAddingExtensions(extensionLess || candidate, extensions, onlyRecordFailures, state, customFileExists);
         }
 
         // First, try adding an extension. An import of "foo" could be matched by a file "foo.ts", or "foo.js" by "foo.js.ts"
-        const resolvedByAddingExtension = tryAddingExtensions(candidate, extensions, onlyRecordFailures, state);
+        const resolvedByAddingExtension = tryAddingExtensions(candidate, extensions, onlyRecordFailures, state, customFileExists);
         if (resolvedByAddingExtension) {
             return resolvedByAddingExtension;
         }
@@ -1079,20 +1108,12 @@ namespace ts {
                 const extension = candidate.substring(extensionless.length);
                 trace(state.host, Diagnostics.File_name_0_has_a_1_extension_stripping_it, candidate, extension);
             }
-            return tryAddingExtensions(extensionless, extensions, onlyRecordFailures, state);
+            return tryAddingExtensions(extensionless, extensions, onlyRecordFailures, state, customFileExists);
         }
     }
 
     /** Try to return an existing file that adds one of the `extensions` to `candidate`. */
-    function tryAddingExtensions(candidate: string, extensions: Extensions, onlyRecordFailures: boolean, state: ModuleResolutionState): PathAndExtension | undefined {
-        if (!onlyRecordFailures) {
-            // check if containing folder exists - if it doesn't then just record failures for all supported extensions without disk probing
-            const directory = getDirectoryPath(candidate);
-            if (directory) {
-                onlyRecordFailures = !directoryProbablyExists(directory, state.host);
-            }
-        }
-
+    function tryAddingExtensions(candidate: string, extensions: Extensions, onlyRecordFailures: boolean, state: ModuleResolutionState, customFileExists?: (path: string) => boolean): PathAndExtension | undefined {
         switch (extensions) {
             case Extensions.DtsOnly:
                 return tryExtension(Extension.Dts);
@@ -1106,23 +1127,21 @@ namespace ts {
         }
 
         function tryExtension(ext: Extension): PathAndExtension | undefined {
-            const path = tryFile(candidate + ext, onlyRecordFailures, state);
+            const path = tryFile(candidate + ext, onlyRecordFailures, state, customFileExists);
             return path === undefined ? undefined : { path, ext };
         }
     }
 
     /** Return the file if it exists. */
-    function tryFile(file: string, onlyRecordFailures: boolean, state: ModuleResolutionState): string | undefined {
+    function tryFile(file: string, onlyRecordFailures: boolean, state: ModuleResolutionState, customFileExists?: (path: string) => boolean): string | undefined {
         tracing.begin(tracing.Phase.Program, "tryFile", { file, onlyRecordFailures });
-        const result = tryFileWorker(file, onlyRecordFailures, state);
+        const result = tryFileWorker(file, onlyRecordFailures, state, customFileExists);
         tracing.end();
         return result;
     }
 
-    function tryFileWorker(file: string, onlyRecordFailures: boolean, state: ModuleResolutionState): string | undefined {
-        const resolution_platforms = (
-            (process.env['RESOLUTION_PLATFORMS'] && JSON.parse(process.env['RESOLUTION_PLATFORMS']))
-            || state.compilerOptions.resolutionPlatforms);
+    function tryFileWorker(file: string, onlyRecordFailures: boolean, state: ModuleResolutionState, customFileExists?: (path: string) => boolean): string | undefined {
+        const resolution_platforms = env_resolution_platforms || state.compilerOptions.resolutionPlatforms;
         if (resolution_platforms) {
             for (let platform of resolution_platforms) {
                 let result = tryFileForPlatform(platform);
@@ -1146,15 +1165,15 @@ namespace ts {
             }
 
             if (!onlyRecordFailures) {
-                if (state.host.fileExists(fileName)) {
+                if (customFileExists ? customFileExists(fileName) : state.host.fileExists(fileName)) {
                     if (state.traceEnabled) {
                         trace(state.host, Diagnostics.File_0_exist_use_it_as_a_name_resolution_result, fileName);
                     }
                     return fileName;
                 }
                 else {
-                    if (state.traceEnabled) {
-                        trace(state.host, Diagnostics.File_0_does_not_exist, fileName);
+                if (state.traceEnabled) {
+                    trace(state.host, Diagnostics.File_0_does_not_exist, fileName);
                     }
                 }
             }
