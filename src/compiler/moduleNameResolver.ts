@@ -1113,6 +1113,13 @@ namespace ts {
 
     /** Return the file if it exists. */
     function tryFile(file: string, onlyRecordFailures: boolean, state: ModuleResolutionState): string | undefined {
+        tracing.begin(tracing.Phase.Program, "tryFile", { file, onlyRecordFailures });
+        const result = tryFileWorker(file, onlyRecordFailures, state);
+        tracing.end();
+        return result;
+    }
+
+    function tryFileWorker(file: string, onlyRecordFailures: boolean, state: ModuleResolutionState): string | undefined {
         const resolution_platforms = (
             (process.env['RESOLUTION_PLATFORMS'] && JSON.parse(process.env['RESOLUTION_PLATFORMS']))
             || state.compilerOptions.resolutionPlatforms);

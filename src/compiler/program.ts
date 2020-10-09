@@ -838,7 +838,9 @@ namespace ts {
                 if (!resolvedProjectReferences) {
                     resolvedProjectReferences = projectReferences.map(parseProjectReferenceConfigFile);
                 }
+                tracing.end();
                 if (rootNames.length) {
+                    tracing.begin(tracing.Phase.Program, "createProgramB", { useSourceOfProjectReferenceRedirect });
                     for (const parsedRef of resolvedProjectReferences) {
                         if (!parsedRef) continue;
                         const out = outFile(parsedRef.commandLine.options);
@@ -862,17 +864,20 @@ namespace ts {
                             }
                         }
                     }
+                    tracing.end();
                 }
-                tracing.end();
             }
 
-            tracing.begin(tracing.Phase.Program, "createProgramB", { });
+            tracing.begin(tracing.Phase.Program, "createProgramC", { });
             forEach(rootNames, name => processRootFile(name, /*isDefaultLib*/ false, /*ignoreNoDefaultLib*/ false));
             tracing.end();
 
-            tracing.begin(tracing.Phase.Program, "createProgramC", { });
+            tracing.begin(tracing.Phase.Program, "createProgramD", { });
             // load type declarations specified via 'types' argument or implicitly from types/ and node_modules/@types folders
             const typeReferences: string[] = rootNames.length ? getAutomaticTypeDirectiveNames(options, host) : emptyArray;
+
+            tracing.end();
+            tracing.begin(tracing.Phase.Program, "createProgramE", { });
 
             if (typeReferences.length) {
                 // This containingFilename needs to match with the one used in managed-side
@@ -883,6 +888,9 @@ namespace ts {
                     processTypeReferenceDirective(typeReferences[i], resolutions[i]);
                 }
             }
+
+            tracing.end();
+            tracing.begin(tracing.Phase.Program, "createProgramF", { });
 
             // Do not process the default library if:
             //  - The '--noLib' flag is used.
@@ -901,6 +909,9 @@ namespace ts {
                     });
                 }
             }
+
+            tracing.end();
+            tracing.begin(tracing.Phase.Program, "createProgramG", { });
 
             missingFilePaths = arrayFrom(mapDefinedIterator(filesByName.entries(), ([path, file]) => file === undefined ? path as Path : undefined));
             files = stableSort(processingDefaultLibFiles, compareDefaultLibFiles).concat(processingOtherFiles);
@@ -999,10 +1010,12 @@ namespace ts {
         return program;
 
         function resolveModuleNamesWorker(moduleNames: string[], containingFile: string, reusedNames?: string[], redirectedReference?: ResolvedProjectReference) {
+            tracing.begin(tracing.Phase.Program, "resolveModuleNamesWorker", { containingFile });
             performance.mark("beforeResolveModule");
             const result = actualResolveModuleNamesWorker(moduleNames, containingFile, reusedNames, redirectedReference);
             performance.mark("afterResolveModule");
             performance.measure("ResolveModule", "beforeResolveModule", "afterResolveModule");
+            tracing.end();
             return result;
         }
 
