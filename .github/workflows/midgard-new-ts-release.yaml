@@ -1,3 +1,9 @@
+# This is a manually triggered workflow which can be triggered from Github
+# https://docs.github.com/en/actions/managing-workflow-runs/manually-running-a-workflow
+#
+# Run this workflow after TypeScript has created a new release
+# If there is a new TypeScript release, this workflow will rebase
+# our changes to TypeScript on top of this new version of TypeScript
 name: New TS release
 on: workflow_dispatch
 jobs:
