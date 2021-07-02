@@ -1223,6 +1223,11 @@ namespace ts {
         return noPackageId(loadModuleFromFile(extensions, candidate, onlyRecordFailures, state));
     }
 
+    // A single-element cache for the directory listing built up by loadModuleFromFile.
+    let oldDir: string | undefined;
+    let oldTime = 0;
+    let existingFiles = new Set<string>();
+
     /**
      * @param {boolean} onlyRecordFailures - if true then function won't try to actually load files but instead record all attempts as failures. This flag is necessary
      * in cases when we know upfront that all load attempts will fail (because containing folder does not exists) however we still need to record all failed lookup locations.
@@ -1240,16 +1245,23 @@ namespace ts {
         if (!onlyRecordFailures) {
             try {
                 const dir = getDirectoryPath(candidate);
-                const existingFiles = new Set<string>();
-                for (const entry of _fs.readdirSync(dir, { withFileTypes: true })) {
-                    if (entry.isFile()) {
-                        existingFiles.add(`${dir}/${entry.name}`);
+                const newTime = timestamp();
+                // If either the directory doesn't match or the cache has expired, recompute
+                if (oldDir !== dir || (newTime - oldTime) > 100) {
+                    oldDir = dir;
+                    oldTime = newTime;
+                    existingFiles.clear();
+                    for (const entry of _fs.readdirSync(dir, { withFileTypes: true })) {
+                        if (entry.isFile()) {
+                            existingFiles.add(`${dir}/${entry.name}`);
+                        }
                     }
                 }
                 customFileExists = path => existingFiles.has(path);
             }
             catch {
                 // If the containing folder doesn't exist, act as though onlyRecordFailures were true
+                oldTime = 0; // Invalidate the cache
             }
         }
 
