@@ -1240,7 +1240,7 @@ namespace ts {
         if (!onlyRecordFailures) {
             try {
                 const dir = getDirectoryPath(candidate);
-                const existingFiles = new Set<string>(); // TODO (acasey): handle missing functionality
+                const existingFiles = new Set<string>();
                 for (const entry of _fs.readdirSync(dir, { withFileTypes: true })) {
                     if (entry.isFile()) {
                         existingFiles.add(`${dir}/${entry.name}`);
@@ -1252,7 +1252,7 @@ namespace ts {
                 // If the containing folder doesn't exist, act as though onlyRecordFailures were true
             }
         }
-        
+
         if (extensions === Extensions.Json || extensions === Extensions.TSConfig) {
             const extensionLess = tryRemoveExtension(candidate, Extension.Json);
             return (extensionLess === undefined && extensions === Extensions.Json) ? undefined : tryAddingExtensions(extensionLess || candidate, extensions, onlyRecordFailures, state, customFileExists);
